@@ -79,14 +79,13 @@ public:
         pipeline::PipelineInfo pipline_info;
         auto pipeline = pipeline::create_pipeline(device_, options, pipline_info);
 
-        RCLCPP_INFO_STREAM(get_logger(), "Pipeline.json" << std::endl
-                                                         << pipeline.serializeToJson());
+        RCLCPP_DEBUG_STREAM(get_logger(), "Pipeline.json" << std::endl
+                                                          << pipeline.serializeToJson());
 
         RCLCPP_INFO(get_logger(), "start pipeline");
         device_->startPipeline(pipeline);
 
         // camera info
-        // using depthai_ros_driver::dai_nodes::sensor_helpers;
         auto calibration_handler = device_->readCalibration2();
 
         info_manager_rgb_ = std::make_shared<camera_info_manager::CameraInfoManager>(this, "oak");
