@@ -147,8 +147,6 @@ namespace pipeline
 
         // manip mono
         auto manip = pipeline.create<dai::node::ImageManip>();
-
-        if (options.rectify_mono)
         {
             auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_C, mono_right->getResolutionWidth(), mono_right->getResolutionHeight());
             manip->setWarpMesh(mesh, w, h);
@@ -157,10 +155,12 @@ namespace pipeline
 
         // manip color
         auto manip_color = pipeline.create<dai::node::ImageManip>();
-        auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_A, color->getIspWidth(), color->getIspHeight());
-        manip_color->setWarpMesh(mesh, w, h);
+        {
+            auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_A, color->getIspWidth(), color->getIspHeight());
+            manip_color->setWarpMesh(mesh, w, h);
+        }
         manip_color->setNumFramesPool(options.pool_size);
-        manip_color->setMaxOutputFrameSize(color->getIspWidth() * color->getIspHeight() * 3 / 2);
+        manip_color->setMaxOutputFrameSize(color->getIspWidth() * color->getIspHeight() * 3 / 2); // nv12, 12bits per pixel
         color->video.link(manip_color->inputImage);
         manip_color->out.link(color_enc_rect->input);
 
@@ -230,18 +230,28 @@ while True:
 
         // right mono encoder
         auto mono_enc = pipeline.create<dai::node::VideoEncoder>();
-        mono_enc->setDefaultProfilePreset(mono_right->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
+        mono_enc->setDefaultProfilePreset(mono_right->getFps() / 2, dai::VideoEncoderProperties::Profile::MJPEG);
         mono_enc->setQuality(options.encoder_quality);
 
-        auto mono_out = pipeline.create<dai::node::XLinkOut>();
-        mono_out->setStreamName("mono");
-
         // script outputs
+        script->outputs["floodR"].link(mono_enc->input);
         script->outputs["floodR"].link(manip->inputImage);
         script->outputs["dotL"].link(stereo->left);
         script->outputs["dotR"].link(stereo->right);
 
-        manip->out.link(mono_enc->input);
+        // right mono rect encoder
+        auto mono_rect_enc = pipeline.create<dai::node::VideoEncoder>();
+        mono_rect_enc->setDefaultProfilePreset(mono_right->getFps() / 2, dai::VideoEncoderProperties::Profile::MJPEG);
+        mono_rect_enc->setQuality(options.encoder_quality);
+
+        auto mono_out = pipeline.create<dai::node::XLinkOut>();
+        mono_out->setStreamName("mono");
+
+        auto mono_rect_out = pipeline.create<dai::node::XLinkOut>();
+        mono_rect_out->setStreamName("mono_rect");
+
+        manip->out.link(mono_rect_enc->input);
+        mono_rect_enc->out.link(mono_rect_out->input);
 
         // sync
         auto sync = pipeline.create<dai::node::Sync>();

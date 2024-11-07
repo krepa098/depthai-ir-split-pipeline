@@ -26,7 +26,6 @@ class Node : public rclcpp::Node
 public:
     Node() : rclcpp::Node("oak")
     {
-        declare_parameter<bool>("rectify_mono");
         declare_parameter<float>("fps");
         declare_parameter<int>("pool_size");
         declare_parameter<int>("encoder_quality");
@@ -35,7 +34,6 @@ public:
 
         pipeline::PipelineOptions options;
 
-        get_parameter("rectify_mono", options.rectify_mono);
         get_parameter("fps", options.fps);
         get_parameter("pool_size", options.pool_size);
         get_parameter("encoder_quality", options.encoder_quality);
@@ -50,6 +48,9 @@ public:
 
         right_mono_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/right/image_raw/compressed", rclcpp::SystemDefaultsQoS());
+
+        right_mono_rect_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
+            "~/right/image_rect/compressed", rclcpp::SystemDefaultsQoS());
 
         stereo_image_pub_ = create_publisher<sensor_msgs::msg::Image>(
             "~/stereo/image_raw", rclcpp::SystemDefaultsQoS());
@@ -104,6 +105,7 @@ public:
 
         RCLCPP_INFO(get_logger(), "creating output queues");
         mono_queue_ = device_->getOutputQueue("mono", 3, false);
+        mono_rect_queue_ = device_->getOutputQueue("mono_rect", 3, false);
         mux_queue_ = device_->getOutputQueue("mux", 3, false);
         imu_queue_ = device_->getOutputQueue("imu", 3, false);
 
@@ -168,6 +170,21 @@ public:
             }
         });
 
+        // right mono rect (compressed)
+        mono_rect_queue_->addCallback([&](std::shared_ptr<dai::ADatatype> callback) { //
+            if (const auto buf = std::dynamic_pointer_cast<dai::EncodedFrame>(callback))
+            {
+                auto msg = img_converter_mono_->toRosFFMPEGPacket(buf);
+
+                sensor_msgs::msg::CompressedImage img;
+                img.data = msg.data;
+                img.format = msg.encoding;
+                img.header.frame_id = msg.header.frame_id;
+                img.header.stamp = msg.header.stamp;
+                right_mono_rect_image_pub_->publish(img);
+            }
+        });
+
         // imu
         imu_queue_->addCallback([&](std::shared_ptr<dai::ADatatype> callback) { //
             if (const auto buf = std::dynamic_pointer_cast<dai::IMUData>(callback))
@@ -192,12 +209,14 @@ public:
     std::shared_ptr<dai::Device> device_;
 
     std::shared_ptr<dai::DataOutputQueue> mono_queue_;
+    std::shared_ptr<dai::DataOutputQueue> mono_rect_queue_;
     std::shared_ptr<dai::DataOutputQueue> imu_queue_;
     std::shared_ptr<dai::DataOutputQueue> mux_queue_;
 
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> color_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> color_image_rect_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> right_mono_image_pub_;
+    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> right_mono_rect_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Image>> stereo_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Imu>> imu_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>> camera_info_pub_;

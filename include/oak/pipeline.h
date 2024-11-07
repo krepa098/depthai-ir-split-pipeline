@@ -12,7 +12,6 @@ namespace pipeline
 
     struct PipelineOptions
     {
-        bool rectify_mono = false;
         float fps = 24.0;
         int pool_size = 24;
         int encoder_quality = 80;
