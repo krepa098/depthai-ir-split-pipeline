@@ -23,9 +23,8 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             parameters = [
                 {'fps': 24.0},
-                {'pool_size': 24},
+                {'pool_size': 12},
                 {'encoder_quality': 90},
-                {'rectify_mono': False},
                 {'floodlight_intensity': 0.2},
                 {'dot_intensity': 0.4},
             ]
