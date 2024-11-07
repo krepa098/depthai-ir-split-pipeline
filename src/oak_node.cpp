@@ -68,7 +68,7 @@ public:
 
         // camera info
         // using depthai_ros_driver::dai_nodes::sensor_helpers;
-        auto calibration_handler = device_->readCalibration();
+        auto calibration_handler = device_->readCalibration2();
 
         info_manager_rgb_ = std::make_shared<camera_info_manager::CameraInfoManager>(this, "oak");
         auto rgb_info = img_converter_rgb_->calibrationToCameraInfo(calibration_handler,
@@ -123,7 +123,7 @@ public:
         mono_queue_->addCallback([&](std::shared_ptr<dai::ADatatype> callback) { //
             if (const auto buf = std::dynamic_pointer_cast<dai::EncodedFrame>(callback))
             {
-                auto msg = img_converter_stereo_->toRosFFMPEGPacket(buf);
+                auto msg = img_converter_mono_->toRosFFMPEGPacket(buf);
 
                 sensor_msgs::msg::CompressedImage img;
                 img.data = msg.data;
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
     auto node = std::make_shared<Node>();
 
     // tf
-    auto calibration_handler = node->device()->readCalibration();
+    auto calibration_handler = node->device()->readCalibration2();
     auto camera_features = node->device()->getConnectedCameraFeatures();
     auto tf_publisher = std::make_shared<dai::rosBridge::TFPublisher>(node, calibration_handler, camera_features, "oak", "oak-d-pro", "oak", "oak", "0", "0", "0", "0", "0", "0", "", "", "", false);
 
