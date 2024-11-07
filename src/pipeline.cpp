@@ -11,11 +11,11 @@ namespace pipeline
     std::tuple<std::vector<std::pair<float, float>>, int, int> get_mesh(std::shared_ptr<dai::Device> &device, dai::CameraBoardSocket socket, int w, int h)
     {
 
-        std::cerr << "creating mesh" << std::endl;
         auto cal = device->readCalibration2();
-        // auto cal = device->readCalibration();
 
         auto m1 = cal.getCameraIntrinsics(socket, std::tuple{w, h});
+
+        // flatten the vector<vector<f32>>
         int rows = m1.size();
         int cols = m1[0].size();
 
@@ -28,20 +28,14 @@ namespace pipeline
         M1 = M1.reshape(0, rows);
 
         auto d1 = cv::Mat(cal.getDistortionCoefficients(socket), true);
+
         cv::Mat map_x;
         cv::Mat map_y;
-        std::cerr << M1 << d1 << std::endl;
-
-        // cv::Mat M1_ = cv::getOptimalNewCameraMatrix(M1, d1, cv::Size(w, h), 1);
+        // cv::Mat M1 = cv::getOptimalNewCameraMatrix(M1, d1, cv::Size(w, h), 0);
         cv::initUndistortRectifyMap(M1, d1, cv::Mat(), M1, cv::Size(w, h), CV_32FC1, map_x, map_y);
 
-        // std::cerr << M1_ << std::endl;
-        // std::cerr << map_x << std::endl;
-
-        const int mesh_cell_size = 32;
+        const int mesh_cell_size = 16;
         std::vector<std::pair<float, float>> mesh;
-
-        std::cerr << "creating mesh" << std::endl;
 
         int mesh_width = 0;
         int mesh_height = 0;
@@ -88,11 +82,10 @@ namespace pipeline
         }
         mesh_width /= mesh_height;
 
-        std::cerr << "creating mesh done " << mesh_width << "x" << mesh_height << std::endl;
         return {mesh, mesh_width, mesh_height};
     }
 
-    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info)
+    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info, bool rectify_mono)
     {
         auto cal = device->readCalibration2();
 
@@ -164,8 +157,11 @@ namespace pipeline
         // manip
         auto manip = pipeline.create<dai::node::ImageManip>();
 
-        auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_C, mono_right->getResolutionWidth(), mono_right->getResolutionHeight());
-        manip->setWarpMesh(mesh, w, h);
+        if (rectify_mono)
+        {
+            auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_C, mono_right->getResolutionWidth(), mono_right->getResolutionHeight());
+            manip->setWarpMesh(mesh, w, h);
+        }
 
         // script
         auto script = pipeline.create<dai::node::Script>();

@@ -27,6 +27,11 @@ class Node : public rclcpp::Node
 public:
     Node() : rclcpp::Node("oak"), imu_filter_(this->get_node_options())
     {
+        declare_parameter<bool>("rectify_mono");
+
+        bool rectify_mono = false;
+        get_parameter("rectify_mono", rectify_mono);
+
         color_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/rgb/image_raw/compressed", rclcpp::SystemDefaultsQoS());
 
@@ -58,7 +63,7 @@ public:
 
         RCLCPP_INFO(get_logger(), "creating pipeline");
         pipeline::PipelineInfo pipline_info;
-        auto pipeline = pipeline::create_pipeline(device_, pipline_info);
+        auto pipeline = pipeline::create_pipeline(device_, pipline_info, rectify_mono);
 
         // RCLCPP_INFO_STREAM(get_logger(), "Pipeline.json" << std::endl
         //                                                  << pipeline.serializeToJson());

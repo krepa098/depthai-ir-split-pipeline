@@ -10,5 +10,5 @@ namespace pipeline
         std::tuple<int, int> color_res;
     };
 
-    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info);
+    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info, bool rectify_mono);
 };

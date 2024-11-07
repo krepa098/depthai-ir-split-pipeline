@@ -15,27 +15,12 @@ def launch_setup(context, *args, **kwargs):
     depthai_prefix = get_package_share_directory("depthai_ros_driver")
 
     name = LaunchConfiguration('name').perform(context)
-    rgb_topic_name = name+'/rgb/image_raw'
 
     return [
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(os.path.join(depthai_prefix, 'launch', 'camera.launch.py')),
-        #     launch_arguments={"name": name,
-        #                       "params_file": params_file,
-        #                       "parent_frame": LaunchConfiguration("parent_frame"),
-        #                        "cam_pos_x": LaunchConfiguration("cam_pos_x"),
-        #                        "cam_pos_y": LaunchConfiguration("cam_pos_y"),
-        #                        "cam_pos_z": LaunchConfiguration("cam_pos_z"),
-        #                        "cam_roll": LaunchConfiguration("cam_roll"),
-        #                        "cam_pitch": LaunchConfiguration("cam_pitch"),
-        #                        "cam_yaw": LaunchConfiguration("cam_yaw"),
-        #                        "use_rviz": LaunchConfiguration("use_rviz")
-        #                        }.items()),
-
         Node(
             package='image_transport',
             executable='republish',
-            name='republish_stereo_compressedDepth',
+            name='oak_republish_stereo_compressedDepth',
             namespace='',
             output='screen',
             remappings=[
@@ -44,70 +29,12 @@ def launch_setup(context, *args, **kwargs):
             ],
             arguments=['raw', 'compressedDepth'],
         ), 
-
         Node(
             package = "oak",
             executable = "oak_node",
             name = "oak",
+            parameters = [{'rectify_mono': False}]
         ),
-
-        # LoadComposableNodes(
-        #     target_container = name + "_container",
-        #     composable_node_descriptions=[
-        #             ComposableNode(
-        #                 package = "image_proc",
-        #                 plugin = "image_proc::RectifyNode",
-        #                 name = "rectify_color_node",
-        #                 remappings = [('image', name+'/rgb/image_raw/compressed'),
-        #                               ('camera_info', name+'/rgb/camera_info'),
-        #                               ('image_rect', name+'/rgb/image_rect'),
-        #                               ('image_rect/compressed', name+'/rgb/image_rect/compressed'),
-        #                               ('image_rect/compressedDepth', name+'/rgb/image_rect/compressedDepth'),
-        #                               ('image_rect/theora', name+'/rgb/image_rect/theora')]
-        #             )
-        #     ]
-        # ),
-        # LoadComposableNodes(
-        #     condition=IfCondition(LaunchConfiguration("rectify_r")),
-        #     target_container=name+"_container",
-        #     composable_node_descriptions=[
-        #             ComposableNode(
-        #                 package="image_proc",
-        #                 plugin="image_proc::RectifyNode",
-        #                 name="rectify_right_node",
-        #                 remappings=[('image', name+'/right/image_raw'),
-        #                             ('camera_info', name+'/right/camera_info'),
-        #                             ('image_rect', name+'/right/image_rect')]
-        #             )
-        #     ]),
-        # LoadComposableNodes(
-        #     condition=IfCondition(LaunchConfiguration("rectify_l")),
-        #     target_container=name+"_container",
-        #     composable_node_descriptions=[
-        #             ComposableNode(
-        #                 package="image_proc",
-        #                 plugin="image_proc::RectifyNode",
-        #                 name="rectify_left_node",
-        #                 remappings=[('image', name+'/left/image_raw'),
-        #                             ('camera_info', name+'/left/camera_info'),
-        #                             ('image_rect', name+'/left/image_rect')]
-        #             )
-        #     ]),
-        # LoadComposableNodes(
-        #     condition=IfCondition(LaunchConfiguration("enable_pc")),
-        #     target_container=name+"_container",
-        #     composable_node_descriptions=[
-        #             ComposableNode(
-        #             package='depth_image_proc',
-        #             plugin='depth_image_proc::PointCloudXyzrgbNode',
-        #             name='point_cloud_xyzrgb_node',
-        #             remappings=[('depth_registered/image_rect', name+'/stereo/image_raw'),
-        #                         ('rgb/image_rect_color', rgb_topic_name),
-        #                         ('rgb/camera_info', name+'/rgb/camera_info'),
-        #                         ('points', name+'/points')]
-        #             ),
-        #     ],
-        # ),
     ]
 
 
