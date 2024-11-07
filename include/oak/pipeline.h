@@ -10,5 +10,13 @@ namespace pipeline
         std::tuple<int, int> color_res;
     };
 
-    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info, bool rectify_mono);
+    struct PipelineOptions
+    {
+        bool rectify_mono = false;
+        float fps = 24.0;
+        int pool_size = 24;
+        int encoder_quality = 80;
+    };
+
+    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineOptions options, PipelineInfo &pipeline_info);
 };

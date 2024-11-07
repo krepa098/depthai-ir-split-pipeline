@@ -28,9 +28,16 @@ public:
     Node() : rclcpp::Node("oak"), imu_filter_(this->get_node_options())
     {
         declare_parameter<bool>("rectify_mono");
+        declare_parameter<float>("fps");
+        declare_parameter<int>("pool_size");
+        declare_parameter<int>("encoder_quality");
 
-        bool rectify_mono = false;
-        get_parameter("rectify_mono", rectify_mono);
+        pipeline::PipelineOptions options;
+
+        get_parameter("rectify_mono", options.rectify_mono);
+        get_parameter("fps", options.fps);
+        get_parameter("pool_size", options.pool_size);
+        get_parameter("encoder_quality", options.encoder_quality);
 
         color_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/rgb/image_raw/compressed", rclcpp::SystemDefaultsQoS());
@@ -63,7 +70,7 @@ public:
 
         RCLCPP_INFO(get_logger(), "creating pipeline");
         pipeline::PipelineInfo pipline_info;
-        auto pipeline = pipeline::create_pipeline(device_, pipline_info, rectify_mono);
+        auto pipeline = pipeline::create_pipeline(device_, options, pipline_info);
 
         // RCLCPP_INFO_STREAM(get_logger(), "Pipeline.json" << std::endl
         //                                                  << pipeline.serializeToJson());
@@ -90,15 +97,11 @@ public:
         info_manager_right_->setCameraInfo(right_info);
 
         RCLCPP_INFO(get_logger(), "creating output queues");
-        sys_logger_queue_ = device_->getOutputQueue("sys_logger", 3, false);
         mono_queue_ = device_->getOutputQueue("mono", 3, false);
         mux_queue_ = device_->getOutputQueue("mux", 3, false);
         imu_queue_ = device_->getOutputQueue("imu", 3, false);
 
         // callbacks
-        sys_logger_queue_->addCallback([&](std::shared_ptr<dai::ADatatype> callback) { //
-        });
-
         mux_queue_->addCallback([&](std::shared_ptr<dai::ADatatype> callback) { //
             if (const auto group = std::dynamic_pointer_cast<dai::MessageGroup>(callback))
             {
@@ -165,7 +168,6 @@ public:
 public:
     std::shared_ptr<dai::Device> device_;
 
-    std::shared_ptr<dai::DataOutputQueue> sys_logger_queue_;
     std::shared_ptr<dai::DataOutputQueue> mono_queue_;
     std::shared_ptr<dai::DataOutputQueue> imu_queue_;
     std::shared_ptr<dai::DataOutputQueue> mux_queue_;

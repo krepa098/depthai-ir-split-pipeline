@@ -4,20 +4,14 @@
 
 namespace pipeline
 {
-    const int pool_size = 24;
-    const float fps = 30.0f;
-    const int enc_quality = 80;
-
     std::tuple<std::vector<std::pair<float, float>>, int, int> get_mesh(std::shared_ptr<dai::Device> &device, dai::CameraBoardSocket socket, int w, int h)
     {
-
         auto cal = device->readCalibration2();
 
         auto m1 = cal.getCameraIntrinsics(socket, std::tuple{w, h});
 
         // flatten the vector<vector<f32>>
         int rows = m1.size();
-        int cols = m1[0].size();
 
         std::vector<float> flatVec;
         for (const auto &row : m1)
@@ -85,14 +79,11 @@ namespace pipeline
         return {mesh, mesh_width, mesh_height};
     }
 
-    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info, bool rectify_mono)
+    dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineOptions options, PipelineInfo &pipeline_info)
     {
         auto cal = device->readCalibration2();
 
         dai::Pipeline pipeline;
-
-        // sys logger (cpu usage, temperature etc.)
-        auto sys_logger = pipeline.create<dai::node::SystemLogger>();
 
         auto imu = pipeline.create<dai::node::IMU>();
         imu->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, 400);
@@ -100,47 +91,48 @@ namespace pipeline
         imu->setMaxBatchReports(10);
 
         // color
-        // auto color = pipeline.create<dai::node::ColorCamera>();
-        // color->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
-        // color->setInterleaved(false);
-        // color->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
-        // color->setBoardSocket(dai::CameraBoardSocket::CAM_A);
-        // color->setFps(fps);
-        // color->setPreviewKeepAspectRatio(false);
-        // color->setIspScale(4, 6);
-        // color->initialControl.setManualFocus(128);
-
-        auto color = pipeline.create<dai::node::Camera>();
-        color->setSize(1280, 720);
-        color->setMeshSource(dai::CameraProperties::WarpMeshSource::CALIBRATION);
-        color->setFps(fps);
+        auto color = pipeline.create<dai::node::ColorCamera>();
+        color->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
+        color->setInterleaved(false);
+        color->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
         color->setBoardSocket(dai::CameraBoardSocket::CAM_A);
+        color->setFps(options.fps);
+        color->setPreviewKeepAspectRatio(false);
+        color->setIspScale(4, 6);
         color->initialControl.setManualFocus(cal.getLensPosition(dai::CameraBoardSocket::CAM_A));
 
-        // color->setIspNumFramesPool(pool_size);
-        // color->setVideoNumFramesPool(pool_size);
+        // auto color = pipeline.create<dai::node::Camera>();
+        // color->setSize(1280, 720);
+        // color->setMeshSource(dai::CameraProperties::WarpMeshSource::CALIBRATION);
+        // color->setFps(fps);
+        // color->setBoardSocket(dai::CameraBoardSocket::CAM_A);
+        // color->initialControl.setManualFocus(cal.getLensPosition(dai::CameraBoardSocket::CAM_A));
+
+        color->setIspNumFramesPool(options.pool_size);
+        color->setVideoNumFramesPool(options.pool_size);
 
         // color encoder
         auto color_enc = pipeline.create<dai::node::VideoEncoder>();
         color_enc->setDefaultProfilePreset(color->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
-        color_enc->setQuality(enc_quality);
+        color_enc->setQuality(options.encoder_quality);
         color->video.link(color_enc->input);
 
-        pipeline_info.mono_res = color->getSize();
+        // pipeline_info.mono_res = color->getSize();
+        pipeline_info.mono_res = color->getIspSize();
 
         // depth / stereo
         auto mono_res = dai::node::MonoCamera::Properties::SensorResolution::THE_720_P;
         auto mono_left = pipeline.create<dai::node::MonoCamera>();
         mono_left->setResolution(mono_res);
         mono_left->setBoardSocket(dai::CameraBoardSocket::CAM_B);
-        mono_left->setFps(fps);
-        mono_left->setNumFramesPool(pool_size);
+        mono_left->setFps(options.fps);
+        mono_left->setNumFramesPool(options.pool_size);
 
         auto mono_right = pipeline.create<dai::node::MonoCamera>();
         mono_right->setResolution(mono_res);
         mono_right->setBoardSocket(dai::CameraBoardSocket::CAM_C);
-        mono_right->setFps(fps);
-        mono_right->setNumFramesPool(pool_size);
+        mono_right->setFps(options.fps);
+        mono_right->setNumFramesPool(options.pool_size);
 
         pipeline_info.mono_res = mono_right->getResolutionSize();
 
@@ -152,22 +144,23 @@ namespace pipeline
         stereo->setSubpixel(true);
         stereo->setLeftRightCheck(true);
         stereo->setDepthAlign(dai::CameraBoardSocket::CAM_A); // rgb
-        stereo->setNumFramesPool(pool_size);
+        stereo->setNumFramesPool(options.pool_size);
 
         // manip
         auto manip = pipeline.create<dai::node::ImageManip>();
 
-        if (rectify_mono)
+        if (options.rectify_mono)
         {
             auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_C, mono_right->getResolutionWidth(), mono_right->getResolutionHeight());
             manip->setWarpMesh(mesh, w, h);
         }
+        manip->setNumFramesPool(options.pool_size);
 
         // script
         auto script = pipeline.create<dai::node::Script>();
         script->setProcessor(dai::ProcessorType::LEON_CSS);
         script->setScript(R"(
-dotBright = 0.1
+dotBright = 0.5
 floodBright = 0.1
 LOGGING = False  # Set `True` for latency/timings debugging
 
@@ -227,7 +220,7 @@ while True:
         // right mono encoder
         auto mono_enc = pipeline.create<dai::node::VideoEncoder>();
         mono_enc->setDefaultProfilePreset(mono_right->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
-        mono_enc->setQuality(enc_quality);
+        mono_enc->setQuality(options.encoder_quality);
 
         auto mono_out = pipeline.create<dai::node::XLinkOut>();
         mono_out->setStreamName("mono");
@@ -248,8 +241,6 @@ while True:
         stereo->depth.link(sync->inputs["depth"]);
 
         // outputs
-        auto sys_logger_out = pipeline.create<dai::node::XLinkOut>();
-        sys_logger_out->setStreamName("sys_logger");
         auto imu_out = pipeline.create<dai::node::XLinkOut>();
         imu_out->setStreamName("imu");
         auto mux_out = pipeline.create<dai::node::XLinkOut>();
@@ -257,7 +248,6 @@ while True:
 
         sync->out.link(mux_out->input);
 
-        sys_logger->out.link(sys_logger_out->input);
         mono_enc->out.link(mono_out->input);
         imu->out.link(imu_out->input);
 
