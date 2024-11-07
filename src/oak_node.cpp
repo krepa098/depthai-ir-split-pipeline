@@ -118,7 +118,9 @@ public:
                     img.header.frame_id = msg.header.frame_id;
                     img.header.stamp = msg.header.stamp;
                     color_image_pub_->publish(img);
-                    camera_info_pub_->publish(info_manager_rgb_->getCameraInfo());
+                    auto cam_info = info_manager_rgb_->getCameraInfo();
+                    cam_info.header = img.header;
+                    camera_info_pub_->publish(cam_info);
                 }
 
                 if (const auto color = group->get<dai::EncodedFrame>("color_rect"))
@@ -131,14 +133,15 @@ public:
                     img.header.frame_id = msg.header.frame_id;
                     img.header.stamp = msg.header.stamp;
                     color_image_rect_pub_->publish(img);
-                    // camera_info_pub_->publish(info_manager_rgb_->getCameraInfo());
                 }
 
                 if (const auto depth = group->get<dai::ImgFrame>("depth"))
                 {
                     auto msg = img_converter_stereo_->toRosMsgRawPtr(depth);
                     stereo_image_pub_->publish(msg);
-                    stereo_info_pub_->publish(info_manager_right_->getCameraInfo());
+                    auto cam_info = info_manager_right_->getCameraInfo();
+                    cam_info.header = msg.header;
+                    stereo_info_pub_->publish(cam_info);
                 }
             }
         });
@@ -156,7 +159,9 @@ public:
                 img.header.stamp = msg.header.stamp;
                 right_mono_image_pub_->publish(img);
 
-                right_info_pub_->publish(info_manager_right_->getCameraInfo());
+                auto cam_info = info_manager_right_->getCameraInfo();
+                cam_info.header = img.header;
+                right_info_pub_->publish(cam_info);
             }
         });
 

@@ -107,6 +107,8 @@ namespace pipeline
         color->setIspNumFramesPool(options.pool_size);
         color->setVideoNumFramesPool(options.pool_size);
 
+        pipeline_info.color_res = color->getIspSize();
+
         // color encoder
         auto color_enc = pipeline.create<dai::node::VideoEncoder>();
         color_enc->setDefaultProfilePreset(color->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
@@ -117,9 +119,6 @@ namespace pipeline
         auto color_enc_rect = pipeline.create<dai::node::VideoEncoder>();
         color_enc_rect->setDefaultProfilePreset(color->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
         color_enc_rect->setQuality(options.encoder_quality);
-
-        // pipeline_info.mono_res = color->getSize();
-        pipeline_info.mono_res = color->getIspSize();
 
         // depth / stereo
         auto mono_res = dai::node::MonoCamera::Properties::SensorResolution::THE_720_P;
