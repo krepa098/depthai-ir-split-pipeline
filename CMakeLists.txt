@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(oak)
+project(depthai-ir-split-pipeline)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -15,9 +15,9 @@ find_package(depthai REQUIRED)
 find_package(depthai_ros_driver REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
-add_executable(${PROJECT_NAME}_node src/oak_node.cpp src/pipeline.cpp)
-target_include_directories(${PROJECT_NAME}_node PRIVATE include)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp depthai_bridge depthai depthai_ros_driver sensor_msgs)
+add_executable(oak_node src/oak_node.cpp src/pipeline.cpp)
+target_include_directories(oak_node PRIVATE include)
+ament_target_dependencies(oak_node rclcpp depthai_bridge depthai depthai_ros_driver sensor_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -36,14 +36,8 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
-install(DIRECTORY
-  config
-  DESTINATION share/${PROJECT_NAME}/
-)
-
-
 install(
-  TARGETS ${PROJECT_NAME}_node
+  TARGETS oak_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

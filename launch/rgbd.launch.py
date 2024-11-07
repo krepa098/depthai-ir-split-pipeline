@@ -17,7 +17,7 @@ def launch_setup(context, *args, **kwargs):
             arguments=['raw', 'compressedDepth'],
         ), 
         Node(
-            package = "oak",
+            package = "depthai-ir-split-pipeline",
             executable = "oak_node",
             name = "oak",
             output='screen',
