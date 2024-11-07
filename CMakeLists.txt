@@ -14,11 +14,10 @@ find_package(depthai_bridge REQUIRED)
 find_package(depthai REQUIRED)
 find_package(depthai_ros_driver REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(imu_filter_madgwick REQUIRED)
 
 add_executable(${PROJECT_NAME}_node src/oak_node.cpp src/pipeline.cpp)
 target_include_directories(${PROJECT_NAME}_node PRIVATE include)
-ament_target_dependencies(${PROJECT_NAME}_node rclcpp depthai_bridge depthai depthai_ros_driver sensor_msgs imu_filter_madgwick)
+ament_target_dependencies(${PROJECT_NAME}_node rclcpp depthai_bridge depthai depthai_ros_driver sensor_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

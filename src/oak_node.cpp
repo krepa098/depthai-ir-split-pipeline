@@ -13,19 +13,18 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 
-#include "imu_filter_madgwick/imu_filter_ros.h"
-
 #include "oak/pipeline.h"
 
 const std::string FRAME_RGB = "oak_rgb_camera_optical_frame";
 const std::string FRAME_STEREO = "oak_rgb_camera_optical_frame";
 const std::string FRAME_RIGHT_MONO = "oak_right_camera_optical_frame";
 const std::string FRAME_LEFT_MONO = "oak_right_camera_optical_frame";
+const std::string FRAME_IMU = "oak_imu_frame";
 
 class Node : public rclcpp::Node
 {
 public:
-    Node() : rclcpp::Node("oak"), imu_filter_(this->get_node_options())
+    Node() : rclcpp::Node("oak")
     {
         declare_parameter<bool>("rectify_mono");
         declare_parameter<float>("fps");
@@ -52,7 +51,7 @@ public:
             "~/stereo/image_raw", rclcpp::SystemDefaultsQoS());
 
         imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(
-            "~/imu", rclcpp::SystemDefaultsQoS());
+            "~/imu/data", rclcpp::SystemDefaultsQoS());
 
         camera_info_pub_ = create_publisher<sensor_msgs::msg::CameraInfo>(
             "~/rgb/camera_info", rclcpp::SystemDefaultsQoS());
@@ -66,7 +65,7 @@ public:
         img_converter_stereo_ = std::make_shared<dai::rosBridge::ImageConverter>(FRAME_STEREO, false);
         img_converter_mono_ = std::make_shared<dai::rosBridge::ImageConverter>(FRAME_RIGHT_MONO, false);
         img_converter_rgb_ = std::make_shared<dai::rosBridge::ImageConverter>(FRAME_RGB, false);
-        imu_converter_ = std::make_shared<dai::rosBridge::ImuConverter>("imu");
+        imu_converter_ = std::make_shared<dai::rosBridge::ImuConverter>(FRAME_IMU);
 
         RCLCPP_INFO(get_logger(), "opening device");
         device_ = std::make_shared<dai::Device>();
@@ -100,7 +99,7 @@ public:
         info_manager_right_->setCameraInfo(right_info);
 
         RCLCPP_INFO(get_logger(), "creating output queues");
-        mono_queue_ = device_->getOutputQueue("mono", 10, false);
+        mono_queue_ = device_->getOutputQueue("mono", 3, false);
         mux_queue_ = device_->getOutputQueue("mux", 3, false);
         imu_queue_ = device_->getOutputQueue("imu", 3, false);
 
@@ -175,7 +174,6 @@ public:
                 for (auto msg : imu_msgs)
                 {
                     imu_pub_->publish(msg);
-                    imu_filter_.imuCallback(std::shared_ptr<sensor_msgs::msg::Imu>(new sensor_msgs::msg::Imu(msg)));
                 }
             }
         });
@@ -206,8 +204,6 @@ public:
     std::shared_ptr<dai::rosBridge::ImageConverter> img_converter_stereo_;
     std::shared_ptr<dai::rosBridge::ImageConverter> img_converter_mono_;
     std::shared_ptr<dai::rosBridge::ImuConverter> imu_converter_;
-
-    ImuFilterMadgwickRos imu_filter_;
 
     std::shared_ptr<camera_info_manager::CameraInfoManager> info_manager_rgb_;
     std::shared_ptr<camera_info_manager::CameraInfoManager> info_manager_right_;
