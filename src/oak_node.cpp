@@ -42,6 +42,9 @@ public:
         color_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/rgb/image_raw/compressed", rclcpp::SystemDefaultsQoS());
 
+        color_image_rect_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
+            "~/rgb/image_rect/compressed", rclcpp::SystemDefaultsQoS());
+
         right_mono_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/right/image_raw/compressed", rclcpp::SystemDefaultsQoS());
 
@@ -72,8 +75,8 @@ public:
         pipeline::PipelineInfo pipline_info;
         auto pipeline = pipeline::create_pipeline(device_, options, pipline_info);
 
-        // RCLCPP_INFO_STREAM(get_logger(), "Pipeline.json" << std::endl
-        //                                                  << pipeline.serializeToJson());
+        RCLCPP_INFO_STREAM(get_logger(), "Pipeline.json" << std::endl
+                                                         << pipeline.serializeToJson());
 
         RCLCPP_INFO(get_logger(), "start pipeline");
         device_->startPipeline(pipeline);
@@ -97,7 +100,7 @@ public:
         info_manager_right_->setCameraInfo(right_info);
 
         RCLCPP_INFO(get_logger(), "creating output queues");
-        mono_queue_ = device_->getOutputQueue("mono", 3, false);
+        mono_queue_ = device_->getOutputQueue("mono", 10, false);
         mux_queue_ = device_->getOutputQueue("mux", 3, false);
         imu_queue_ = device_->getOutputQueue("imu", 3, false);
 
@@ -116,6 +119,19 @@ public:
                     img.header.stamp = msg.header.stamp;
                     color_image_pub_->publish(img);
                     camera_info_pub_->publish(info_manager_rgb_->getCameraInfo());
+                }
+
+                if (const auto color = group->get<dai::EncodedFrame>("color_rect"))
+                {
+                    auto msg = img_converter_rgb_->toRosFFMPEGPacket(color);
+
+                    sensor_msgs::msg::CompressedImage img;
+                    img.data = msg.data;
+                    img.format = msg.encoding;
+                    img.header.frame_id = msg.header.frame_id;
+                    img.header.stamp = msg.header.stamp;
+                    color_image_rect_pub_->publish(img);
+                    // camera_info_pub_->publish(info_manager_rgb_->getCameraInfo());
                 }
 
                 if (const auto depth = group->get<dai::ImgFrame>("depth"))
@@ -173,6 +189,7 @@ public:
     std::shared_ptr<dai::DataOutputQueue> mux_queue_;
 
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> color_image_pub_;
+    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> color_image_rect_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> right_mono_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Image>> stereo_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Imu>> imu_pub_;

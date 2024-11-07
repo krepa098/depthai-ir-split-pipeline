@@ -6,6 +6,9 @@ namespace pipeline
 {
     std::tuple<std::vector<std::pair<float, float>>, int, int> get_mesh(std::shared_ptr<dai::Device> &device, dai::CameraBoardSocket socket, int w, int h)
     {
+        // device->setLogLevel(dai::LogLevel::DEBUG);
+        // device->setLogOutputLevel(dai::LogLevel::DEBUG);
+
         auto cal = device->readCalibration2();
 
         auto m1 = cal.getCameraIntrinsics(socket, std::tuple{w, h});
@@ -101,13 +104,6 @@ namespace pipeline
         color->setIspScale(4, 6);
         color->initialControl.setManualFocus(cal.getLensPosition(dai::CameraBoardSocket::CAM_A));
 
-        // auto color = pipeline.create<dai::node::Camera>();
-        // color->setSize(1280, 720);
-        // color->setMeshSource(dai::CameraProperties::WarpMeshSource::CALIBRATION);
-        // color->setFps(fps);
-        // color->setBoardSocket(dai::CameraBoardSocket::CAM_A);
-        // color->initialControl.setManualFocus(cal.getLensPosition(dai::CameraBoardSocket::CAM_A));
-
         color->setIspNumFramesPool(options.pool_size);
         color->setVideoNumFramesPool(options.pool_size);
 
@@ -116,6 +112,11 @@ namespace pipeline
         color_enc->setDefaultProfilePreset(color->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
         color_enc->setQuality(options.encoder_quality);
         color->video.link(color_enc->input);
+
+        // color_rect encoder
+        auto color_enc_rect = pipeline.create<dai::node::VideoEncoder>();
+        color_enc_rect->setDefaultProfilePreset(color->getFps(), dai::VideoEncoderProperties::Profile::MJPEG);
+        color_enc_rect->setQuality(options.encoder_quality);
 
         // pipeline_info.mono_res = color->getSize();
         pipeline_info.mono_res = color->getIspSize();
@@ -144,9 +145,8 @@ namespace pipeline
         stereo->setSubpixel(true);
         stereo->setLeftRightCheck(true);
         stereo->setDepthAlign(dai::CameraBoardSocket::CAM_A); // rgb
-        stereo->setNumFramesPool(options.pool_size);
 
-        // manip
+        // manip mono
         auto manip = pipeline.create<dai::node::ImageManip>();
 
         if (options.rectify_mono)
@@ -154,7 +154,16 @@ namespace pipeline
             auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_C, mono_right->getResolutionWidth(), mono_right->getResolutionHeight());
             manip->setWarpMesh(mesh, w, h);
         }
-        manip->setNumFramesPool(options.pool_size);
+        manip->setMaxOutputFrameSize(mono_right->getResolutionWidth() * mono_right->getResolutionHeight());
+
+        // manip color
+        auto manip_color = pipeline.create<dai::node::ImageManip>();
+        auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_A, color->getIspWidth(), color->getIspHeight());
+        manip_color->setWarpMesh(mesh, w, h);
+        manip_color->setNumFramesPool(options.pool_size);
+        manip_color->setMaxOutputFrameSize(color->getIspWidth() * color->getIspHeight() * 3 / 2);
+        color->video.link(manip_color->inputImage);
+        manip_color->out.link(color_enc_rect->input);
 
         // script
         auto script = pipeline.create<dai::node::Script>();
@@ -234,10 +243,10 @@ while True:
 
         // sync
         auto sync = pipeline.create<dai::node::Sync>();
-        sync->setSyncThreshold(std::chrono::milliseconds(200));
-        sync->setSyncAttempts(2);
+        sync->setSyncThreshold(std::chrono::milliseconds(50));
 
         color_enc->out.link(sync->inputs["color"]);
+        color_enc_rect->out.link(sync->inputs["color_rect"]);
         stereo->depth.link(sync->inputs["depth"]);
 
         // outputs

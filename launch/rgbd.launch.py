@@ -33,6 +33,7 @@ def launch_setup(context, *args, **kwargs):
             package = "oak",
             executable = "oak_node",
             name = "oak",
+            output='screen',
             parameters = [
                 {'fps': 24.0},
                 {'pool_size': 24},
