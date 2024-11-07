@@ -39,6 +39,8 @@ def launch_setup(context, *args, **kwargs):
                 {'pool_size': 24},
                 {'encoder_quality': 90},
                 {'rectify_mono': False},
+                {'floodlight_intensity': 0.2},
+                {'dot_intensity': 0.4},
             ]
         ),
     ]

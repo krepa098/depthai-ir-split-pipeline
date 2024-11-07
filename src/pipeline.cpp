@@ -165,11 +165,10 @@ namespace pipeline
         manip_color->out.link(color_enc_rect->input);
 
         // script
-        auto script = pipeline.create<dai::node::Script>();
-        script->setProcessor(dai::ProcessorType::LEON_CSS);
-        script->setScript(R"(
-dotBright = 0.5
-floodBright = 0.1
+        std::stringstream ss;
+        ss << "dotBright = " << options.dot_intensity << std::endl;
+        ss << "floodBright = " << options.floodlight_intensity << std::endl;
+        ss << R"(
 LOGGING = False  # Set `True` for latency/timings debugging
 
 node.warn(f'IR drivers detected: {str(Device.getIrDrivers())}')
@@ -218,7 +217,11 @@ while True:
     node.io['dotR' if flagDot else 'floodR'].send(frameR)
 
     flagDot = not flagDot
-        )");
+)";
+
+        auto script = pipeline.create<dai::node::Script>();
+        script->setProcessor(dai::ProcessorType::LEON_CSS);
+        script->setScript(ss.str());
 
         // script inputs
         mono_left->frameEvent.link(script->inputs["event"]);

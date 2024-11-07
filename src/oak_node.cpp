@@ -30,6 +30,8 @@ public:
         declare_parameter<float>("fps");
         declare_parameter<int>("pool_size");
         declare_parameter<int>("encoder_quality");
+        declare_parameter<float>("floodlight_intensity");
+        declare_parameter<float>("dot_intensity");
 
         pipeline::PipelineOptions options;
 
@@ -37,6 +39,8 @@ public:
         get_parameter("fps", options.fps);
         get_parameter("pool_size", options.pool_size);
         get_parameter("encoder_quality", options.encoder_quality);
+        get_parameter("floodlight_intensity", options.floodlight_intensity);
+        get_parameter("dot_intensity", options.dot_intensity);
 
         color_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/rgb/image_raw/compressed", rclcpp::SystemDefaultsQoS());
