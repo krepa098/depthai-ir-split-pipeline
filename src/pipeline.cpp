@@ -1,5 +1,6 @@
 #include "oak/pipeline.h"
 #include "opencv2/opencv.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace pipeline
 {
@@ -7,72 +8,89 @@ namespace pipeline
     const float fps = 30.0f;
     const int enc_quality = 80;
 
-    // void get_mesh(std::shared_ptr<dai::Device> &device, dai::CameraBoardSocket socket, int w, int h)
-    // {
-    //     auto cal = device->readCalibrationOrDefault();
+    std::tuple<std::vector<std::pair<float, float>>, int, int> get_mesh(std::shared_ptr<dai::Device> &device, dai::CameraBoardSocket socket, int w, int h)
+    {
 
-    //     auto m1 = cal.getCameraIntrinsics(socket, std::tuple{w, h});
-    //     int rows = m1.size();
-    //     int cols = m1[0].size();
+        std::cerr << "creating mesh" << std::endl;
+        auto cal = device->readCalibration2();
+        // auto cal = device->readCalibration();
 
-    //     std::vector<float> flatVec;
-    //     for (const auto &row : m1)
-    //     {
-    //         flatVec.insert(flatVec.end(), row.begin(), row.end());
-    //     }
-    //     cv::Mat M1(rows, cols, CV_32F, flatVec.data());
+        auto m1 = cal.getCameraIntrinsics(socket, std::tuple{w, h});
+        int rows = m1.size();
+        int cols = m1[0].size();
 
-    //     auto d1 = cv::Mat(cal.getDistortionCoefficients(socket));
-    //     auto R1 = cv::Mat::eye(3, 3, CV_32FC1);
-    //     cv::Mat map_x;
-    //     cv::Mat map_y;
-    //     cv::initUndistortRectifyMap(M1, d1, R1, M1, {w, h}, CV_32FC1, map_x, map_y);
+        std::vector<float> flatVec;
+        for (const auto &row : m1)
+        {
+            flatVec.insert(flatVec.end(), row.begin(), row.end());
+        }
+        cv::Mat M1(flatVec, true);
+        M1 = M1.reshape(0, rows);
 
-    //     const int mesh_cell_size = 16;
-    //     std::vector<float> mesh;
+        auto d1 = cv::Mat(cal.getDistortionCoefficients(socket), true);
+        cv::Mat map_x;
+        cv::Mat map_y;
+        std::cerr << M1 << d1 << std::endl;
 
-    //     for (int y = 0; y < map_x.cols; ++y)
-    //     {
-    //         if (y % mesh_cell_size == 0)
-    //         {
-    //             // std::vector<float> row_left;
-    //             for (int x = 0; x < map_x.rows; ++y)
-    //             {
-    //                 if (x % mesh_cell_size == 0)
-    //                 {
-    //                     if (y == map_x.cols && x == map_x.rows)
-    //                     {
-    //                         mesh.push_back(map_x.at<float>(y - 1, x - 1));
-    //                         mesh.push_back(map_y.at<float>(y - 1, x - 1));
-    //                     }
-    //                     else if (y == map_x.cols)
-    //                     {
-    //                         mesh.push_back(map_x.at<float>(y - 1, x));
-    //                         mesh.push_back(map_y.at<float>(y - 1, x));
-    //                     }
-    //                     else if (x == map_x.rows)
-    //                     {
-    //                         mesh.push_back(map_x.at<float>(y, x - 1));
-    //                         mesh.push_back(map_y.at<float>(y, x - 1));
-    //                     }
-    //                     else
-    //                     {
-    //                         mesh.push_back(map_x.at<float>(y, x));
-    //                         mesh.push_back(map_y.at<float>(y, x));
-    //                     }
-    //                 }
-    //             }
+        // cv::Mat M1_ = cv::getOptimalNewCameraMatrix(M1, d1, cv::Size(w, h), 1);
+        cv::initUndistortRectifyMap(M1, d1, cv::Mat(), M1, cv::Size(w, h), CV_32FC1, map_x, map_y);
 
-    //             if ((map_x.rows % mesh_cell_size) % 2 != 0)
-    //             {
-    //                 mesh.push_back(0);
-    //                 mesh.push_back(0);
-    //             }
-    //         }
-    //     }
+        // std::cerr << M1_ << std::endl;
+        // std::cerr << map_x << std::endl;
 
-    //      cv::Mat mesh0(rows, cols, CV_32F, flatVec.data());
-    // }
+        const int mesh_cell_size = 32;
+        std::vector<std::pair<float, float>> mesh;
+
+        std::cerr << "creating mesh" << std::endl;
+
+        int mesh_width = 0;
+        int mesh_height = 0;
+
+        for (int y = 0; y <= map_x.rows; ++y) // over the height
+        {
+            if (y % mesh_cell_size == 0)
+            {
+                mesh_height++;
+                // std::vector<float> row_left;
+                for (int x = 0; x < map_x.cols; ++x) // over the width
+                {
+                    if (x % mesh_cell_size == 0)
+                    {
+                        mesh_width++;
+                        if (y == map_x.rows && x == map_x.cols)
+                        {
+                            mesh.push_back({map_x.at<float>(y - 1, x - 1),
+                                            map_y.at<float>(y - 1, x - 1)});
+                        }
+                        else if (y == map_x.rows)
+                        {
+                            mesh.push_back({map_x.at<float>(y - 1, x),
+                                            map_y.at<float>(y - 1, x)});
+                        }
+                        else if (x == map_x.rows)
+                        {
+                            mesh.push_back({map_x.at<float>(y, x - 1),
+                                            map_y.at<float>(y, x - 1)});
+                        }
+                        else
+                        {
+                            mesh.push_back({map_x.at<float>(y, x),
+                                            map_y.at<float>(y, x)});
+                        }
+                    }
+                }
+
+                if ((map_x.cols % mesh_cell_size) % 2 != 0)
+                {
+                    mesh.push_back({0.0, 0.0});
+                }
+            }
+        }
+        mesh_width /= mesh_height;
+
+        std::cerr << "creating mesh done " << mesh_width << "x" << mesh_height << std::endl;
+        return {mesh, mesh_width, mesh_height};
+    }
 
     dai::Pipeline create_pipeline(std::shared_ptr<dai::Device> &device, PipelineInfo &pipeline_info)
     {
@@ -143,8 +161,11 @@ namespace pipeline
         stereo->setDepthAlign(dai::CameraBoardSocket::CAM_A); // rgb
         stereo->setNumFramesPool(pool_size);
 
-        // auto stereo_rect = pipeline.create<dai::node::StereoDepth>();
-        // stereo_rect->setRectification(true);
+        // manip
+        auto manip = pipeline.create<dai::node::ImageManip>();
+
+        auto [mesh, w, h] = get_mesh(device, dai::CameraBoardSocket::CAM_C, mono_right->getResolutionWidth(), mono_right->getResolutionHeight());
+        manip->setWarpMesh(mesh, w, h);
 
         // script
         auto script = pipeline.create<dai::node::Script>();
@@ -216,9 +237,11 @@ while True:
         mono_out->setStreamName("mono");
 
         // script outputs
-        script->outputs["floodR"].link(mono_enc->input);
+        script->outputs["floodR"].link(manip->inputImage);
         script->outputs["dotL"].link(stereo->left);
         script->outputs["dotR"].link(stereo->right);
+
+        manip->out.link(mono_enc->input);
 
         // sync
         auto sync = pipeline.create<dai::node::Sync>();
