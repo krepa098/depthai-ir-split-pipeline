@@ -14,10 +14,21 @@ find_package(depthai_bridge REQUIRED)
 find_package(depthai REQUIRED)
 find_package(depthai_ros_driver REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(cv_bridge REQUIRED)
 
 add_executable(oak_node src/oak_node.cpp src/pipeline.cpp)
 target_include_directories(oak_node PRIVATE include)
-ament_target_dependencies(oak_node rclcpp depthai_bridge depthai depthai_ros_driver sensor_msgs)
+ament_target_dependencies(
+  oak_node 
+  rclcpp 
+  depthai_bridge 
+  depthai 
+  depthai_ros_driver 
+  sensor_msgs
+  pluginlib
+  image_transport
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -13,6 +13,11 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 
+// #include "oak/codec.h"
+#include "image_transport/image_transport.hpp"
+#include "image_transport/publisher_plugin.hpp"
+#include "pluginlib/class_loader.hpp"
+
 #include "oak/pipeline.h"
 
 const std::string FRAME_RGB = "oak_rgb_camera_optical_frame";
@@ -20,6 +25,8 @@ const std::string FRAME_STEREO = "oak_rgb_camera_optical_frame";
 const std::string FRAME_RIGHT_MONO = "oak_right_camera_optical_frame";
 const std::string FRAME_LEFT_MONO = "oak_right_camera_optical_frame";
 const std::string FRAME_IMU = "oak_imu_frame";
+
+typedef image_transport::PublisherPlugin Plugin;
 
 class Node : public rclcpp::Node
 {
@@ -31,6 +38,17 @@ public:
         declare_parameter<int>("encoder_quality");
         declare_parameter<float>("floodlight_intensity");
         declare_parameter<float>("dot_intensity");
+        declare_parameter<int>("png_level");
+
+        // load the image transport plugin
+        pluginlib::ClassLoader<Plugin> cdp_loader(
+            "image_transport",
+            "image_transport::PublisherPlugin");
+
+        std::string lookup_name = Plugin::getLookupName("compressedDepth");
+
+        cdp_ = cdp_loader.createSharedInstance(lookup_name);
+        cdp_->advertise(this, "~/stereo/image_raw");
 
         pipeline::PipelineOptions options;
 
@@ -51,9 +69,6 @@ public:
 
         right_mono_rect_image_pub_ = create_publisher<sensor_msgs::msg::CompressedImage>(
             "~/right/image_rect/compressed", rclcpp::SystemDefaultsQoS());
-
-        stereo_image_pub_ = create_publisher<sensor_msgs::msg::Image>(
-            "~/stereo/image_raw", rclcpp::SystemDefaultsQoS());
 
         imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(
             "~/imu/data", rclcpp::SystemDefaultsQoS());
@@ -121,31 +136,40 @@ public:
                     img.format = msg.encoding;
                     img.header.frame_id = msg.header.frame_id;
                     img.header.stamp = msg.header.stamp;
-                    color_image_pub_->publish(img);
+                    if (color_image_pub_->get_subscription_count() > 0)
+                        color_image_pub_->publish(img);
+
                     auto cam_info = info_manager_rgb_->getCameraInfo();
                     cam_info.header = img.header;
-                    camera_info_pub_->publish(cam_info);
+                    if (camera_info_pub_->get_subscription_count() > 0)
+                        camera_info_pub_->publish(cam_info);
                 }
 
                 if (const auto color = group->get<dai::EncodedFrame>("color_rect"))
                 {
-                    auto msg = img_converter_rgb_->toRosFFMPEGPacket(color);
-
-                    sensor_msgs::msg::CompressedImage img;
-                    img.data = msg.data;
-                    img.format = msg.encoding;
-                    img.header.frame_id = msg.header.frame_id;
-                    img.header.stamp = msg.header.stamp;
-                    color_image_rect_pub_->publish(img);
+                    if (color_image_rect_pub_->get_subscription_count() > 0)
+                    {
+                        auto msg = img_converter_rgb_->toRosFFMPEGPacket(color);
+                        sensor_msgs::msg::CompressedImage img;
+                        img.data = msg.data;
+                        img.format = msg.encoding;
+                        img.header.frame_id = msg.header.frame_id;
+                        img.header.stamp = msg.header.stamp;
+                        color_image_rect_pub_->publish(img);
+                    }
                 }
 
                 if (const auto depth = group->get<dai::ImgFrame>("depth"))
                 {
-                    auto msg = img_converter_stereo_->toRosMsgRawPtr(depth);
-                    stereo_image_pub_->publish(msg);
-                    auto cam_info = info_manager_right_->getCameraInfo();
-                    cam_info.header = msg.header;
-                    stereo_info_pub_->publish(cam_info);
+                    if (cdp_->getNumSubscribers() > 0)
+                    {
+                        auto msg = img_converter_stereo_->toRosMsgPtr(depth);
+                        cdp_->publish(*msg);
+                        auto cam_info = info_manager_right_->getCameraInfo();
+                        cam_info.header = msg->header;
+                        if (stereo_info_pub_->get_subscription_count() > 0)
+                            stereo_info_pub_->publish(cam_info);
+                    }
                 }
             }
         });
@@ -161,11 +185,13 @@ public:
                 img.format = msg.encoding;
                 img.header.frame_id = msg.header.frame_id;
                 img.header.stamp = msg.header.stamp;
-                right_mono_image_pub_->publish(img);
+                if (right_mono_image_pub_->get_subscription_count() > 0)
+                    right_mono_image_pub_->publish(img);
 
                 auto cam_info = info_manager_right_->getCameraInfo();
                 cam_info.header = img.header;
-                right_info_pub_->publish(cam_info);
+                if (right_info_pub_->get_subscription_count() > 0)
+                    right_info_pub_->publish(cam_info);
             }
         });
 
@@ -180,7 +206,8 @@ public:
                 img.format = msg.encoding;
                 img.header.frame_id = msg.header.frame_id;
                 img.header.stamp = msg.header.stamp;
-                right_mono_rect_image_pub_->publish(img);
+                if (right_mono_rect_image_pub_->get_subscription_count() > 0)
+                    right_mono_rect_image_pub_->publish(img);
             }
         });
 
@@ -193,7 +220,8 @@ public:
 
                 for (auto msg : imu_msgs)
                 {
-                    imu_pub_->publish(msg);
+                    if (imu_pub_->get_subscription_count() > 0)
+                        imu_pub_->publish(msg);
                 }
             }
         });
@@ -216,7 +244,6 @@ public:
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> color_image_rect_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> right_mono_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CompressedImage>> right_mono_rect_image_pub_;
-    std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Image>> stereo_image_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::Imu>> imu_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>> camera_info_pub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>> right_info_pub_;
@@ -229,10 +256,13 @@ public:
 
     std::shared_ptr<camera_info_manager::CameraInfoManager> info_manager_rgb_;
     std::shared_ptr<camera_info_manager::CameraInfoManager> info_manager_right_;
+
+    std::shared_ptr<Plugin> cdp_;
 };
 
 int main(int argc, char *argv[])
 {
+
     rclcpp::init(argc, argv);
     auto node = std::make_shared<Node>();
 

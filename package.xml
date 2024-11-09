@@ -17,6 +17,7 @@
   <depend>depthai_ros</depend>
   <depend>depthai_bridge</depend>
   <depend>rclcpp</depend>
+  <depend>image_transport</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
