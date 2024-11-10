@@ -28,6 +28,10 @@ const std::string FRAME_IMU = "oak_imu_frame";
 
 typedef image_transport::PublisherPlugin Plugin;
 
+pluginlib::ClassLoader<Plugin> img_transport_loader(
+    "image_transport",
+    "image_transport::PublisherPlugin");
+
 class Node : public rclcpp::Node
 {
 public:
@@ -38,16 +42,11 @@ public:
         declare_parameter<int>("encoder_quality");
         declare_parameter<float>("floodlight_intensity");
         declare_parameter<float>("dot_intensity");
-        declare_parameter<int>("png_level");
 
         // load the image transport plugin
-        pluginlib::ClassLoader<Plugin> cdp_loader(
-            "image_transport",
-            "image_transport::PublisherPlugin");
 
         std::string lookup_name = Plugin::getLookupName("compressedDepth");
-
-        cdp_ = cdp_loader.createSharedInstance(lookup_name);
+        cdp_ = img_transport_loader.createSharedInstance(lookup_name);
         cdp_->advertise(this, "~/stereo/image_raw");
 
         pipeline::PipelineOptions options;

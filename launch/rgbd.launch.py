@@ -15,7 +15,8 @@ def launch_setup(context, *args, **kwargs):
                 {'encoder_quality': 90},
                 {'floodlight_intensity': 0.2},
                 {'dot_intensity': 0.4},
-                {'png_level': 1},
+                {'.stereo.image_raw.compressedDepth.png_level': 3},
+                {'.stereo.image_raw.compressedDepth.format': 'rvl'},
             ]
         ),
     ]
