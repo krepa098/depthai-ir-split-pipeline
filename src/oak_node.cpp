@@ -133,8 +133,7 @@ public:
                     sensor_msgs::msg::CompressedImage img;
                     img.data = msg.data;
                     img.format = msg.encoding;
-                    img.header.frame_id = msg.header.frame_id;
-                    img.header.stamp = msg.header.stamp;
+                    img.header = msg.header;
                     if (color_image_pub_->get_subscription_count() > 0)
                         color_image_pub_->publish(img);
 
@@ -152,8 +151,7 @@ public:
                         sensor_msgs::msg::CompressedImage img;
                         img.data = msg.data;
                         img.format = msg.encoding;
-                        img.header.frame_id = msg.header.frame_id;
-                        img.header.stamp = msg.header.stamp;
+                        img.header = msg.header;
                         color_image_rect_pub_->publish(img);
                     }
                 }
@@ -182,8 +180,7 @@ public:
                 sensor_msgs::msg::CompressedImage img;
                 img.data = msg.data;
                 img.format = msg.encoding;
-                img.header.frame_id = msg.header.frame_id;
-                img.header.stamp = msg.header.stamp;
+                img.header = msg.header;
                 if (right_mono_image_pub_->get_subscription_count() > 0)
                     right_mono_image_pub_->publish(img);
 
@@ -203,8 +200,7 @@ public:
                 sensor_msgs::msg::CompressedImage img;
                 img.data = msg.data;
                 img.format = msg.encoding;
-                img.header.frame_id = msg.header.frame_id;
-                img.header.stamp = msg.header.stamp;
+                img.header = msg.header;
                 if (right_mono_rect_image_pub_->get_subscription_count() > 0)
                     right_mono_rect_image_pub_->publish(img);
             }
