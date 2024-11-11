@@ -255,7 +255,7 @@ while True:
 
         // sync
         auto sync = pipeline.create<dai::node::Sync>();
-        sync->setSyncThreshold(std::chrono::milliseconds(50));
+        sync->setSyncThreshold(std::chrono::milliseconds(30));
 
         color_enc->out.link(sync->inputs["color"]);
         color_enc_rect->out.link(sync->inputs["color_rect"]);
